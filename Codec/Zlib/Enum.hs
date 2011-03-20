@@ -17,14 +17,14 @@ import Control.Monad.Trans (MonadIO, liftIO, lift)
 import Data.ByteString (ByteString)
 
 ------------------------------------------------------------------------------
--- Parameters
+-- Default WindowBits
 ------------------------------------------------------------------------------
 
-zlibConfig :: WindowBits
-zlibConfig =  WindowBits 15
+zlibWin :: WindowBits
+zlibWin =  WindowBits 15
 
-gzipConfig :: WindowBits
-gzipConfig =  WindowBits 31
+gzipWin :: WindowBits
+gzipWin =  WindowBits 31
 
 ------------------------------------------------------------------------------
 -- Decompression
@@ -35,14 +35,14 @@ gzipConfig =  WindowBits 31
 decompressZlib
     :: MonadIO m
     => Enumeratee ByteString ByteString m a
-decompressZlib = decompressWith zlibConfig
+decompressZlib = decompressWith zlibWin
 
 -- |
 -- Decompress a stream of 'ByteString's in the gzip format.
 decompressGZip
     :: MonadIO m
     => Enumeratee ByteString ByteString m a
-decompressGZip = decompressWith gzipConfig
+decompressGZip = decompressWith gzipWin
 
 -- |
 -- Decompress (inflate) a stream of 'ByteString's with custom
@@ -90,16 +90,16 @@ decompressWith' _ step = return step
 compressZlib
     :: MonadIO m
     => Enumeratee ByteString ByteString m a
-compressZlib = compressWith 6 zlibConfig
--- Note: Using the same settings as package zlib
+compressZlib = compressWith 6 zlibWin
+-- Note: Using the same default compression level as the package zlib.
 
 -- |
 -- Compress a stream of 'ByteString's into the gzip format.
 compressGZip
     :: MonadIO m
     => Enumeratee ByteString ByteString m a
-compressGZip = compressWith 6 gzipConfig
--- Note: Using the same settings as package zlib
+compressGZip = compressWith 6 gzipWin
+-- Note: Using the same default compressison level as the package gzip.
 
 -- |
 -- Compress (deflate) a stream of 'ByteString's with custom
