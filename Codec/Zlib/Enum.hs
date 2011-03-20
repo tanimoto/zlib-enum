@@ -99,7 +99,7 @@ compressGZip
     :: MonadIO m
     => Enumeratee ByteString ByteString m a
 compressGZip = compressWith 6 gzipWin
--- Note: Using the same default compressison level as the package gzip.
+-- Note: Using the same default compressison level as the package zlib.
 
 -- |
 -- Compress (deflate) a stream of 'ByteString's with custom
