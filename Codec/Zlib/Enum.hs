@@ -1,6 +1,11 @@
 module Codec.Zlib.Enum (
     -- * Enumeratees
-    compress, decompress,
+    -- ** Zlib Format
+    compressZlib, decompressZlib,
+    -- ** GZip Format
+    compressGZip, decompressGZip,
+    -- ** Custom Parameters
+    compressWith, decompressWith,
     -- * Re-exported from zlib-bindings
     WindowBits, defaultWindowBits
 ) where
@@ -10,24 +15,54 @@ import Data.Enumerator as E
 import qualified Data.Enumerator.List as EL
 import Control.Monad.Trans (MonadIO, liftIO, lift)
 import Data.ByteString (ByteString)
-import Control.Monad (join)
 
+------------------------------------------------------------------------------
+-- Parameters
+------------------------------------------------------------------------------
+
+zlibConfig :: WindowBits
+zlibConfig =  WindowBits 15
+
+gzipConfig :: WindowBits
+gzipConfig =  WindowBits 31
+
+------------------------------------------------------------------------------
+-- Decompression
+------------------------------------------------------------------------------
 
 -- |
--- Decompress (inflate) a stream of 'ByteString's. For example:
---
--- >    run $ enumFile "test.z" $$ decompress defaultWindowBits $$ printChunks True
+-- Decompress a stream of 'ByteString's in the zlib format.
+decompressZlib
+    :: MonadIO m
+    => Enumeratee ByteString ByteString m a
+decompressZlib = decompressWith zlibConfig
 
-decompress
+-- |
+-- Decompress a stream of 'ByteString's in the gzip format.
+decompressGZip
+    :: MonadIO m
+    => Enumeratee ByteString ByteString m a
+decompressGZip = decompressWith gzipConfig
+
+-- |
+-- Decompress (inflate) a stream of 'ByteString's with custom
+-- parameters. For example:
+--
+-- >    run $ enumFile "test.z" $$ decompressWith defaultWindowBits $$ printChunks True
+
+decompressWith
     :: MonadIO m
     => WindowBits -- ^ Zlib parameter (see the zlib-bindings package as well as the zlib C library)
     -> Enumeratee ByteString ByteString m a
-decompress config inner = do
+decompressWith config inner = do
     inf <- liftIO $ initInflate config
-    decompress' inf inner
+    decompressWith' inf inner
 
-decompress' :: MonadIO m => Inflate -> Enumeratee ByteString ByteString m b
-decompress' inf (Continue k) = do
+decompressWith'
+    :: MonadIO m
+    => Inflate
+    -> Enumeratee ByteString ByteString m b
+decompressWith' inf (Continue k) = do
     x <- EL.head
     case x of
         Nothing -> do
@@ -36,30 +71,54 @@ decompress' inf (Continue k) = do
         Just bs -> do
             chunks <- liftIO $ withInflateInput inf bs $ go id
             step <- lift $ runIteratee $ k $ Chunks chunks
-            decompress' inf step
+            decompressWith' inf step
     where
     go front pop = do
         x <- pop
         case x of
             Nothing -> return $ front []
             Just y -> go (front . (:) y) pop
-decompress' _ step = return step
+decompressWith' _ step = return step
+
+
+------------------------------------------------------------------------------
+-- Compression
+------------------------------------------------------------------------------
 
 -- |
--- Compress (deflate) a stream of 'ByteString's. The 'WindowBits' also control
--- the format (zlib vs. gzip).
+-- Compress a stream of 'ByteString's into the zlib format.
+compressZlib
+    :: MonadIO m
+    => Enumeratee ByteString ByteString m a
+compressZlib = compressWith 6 zlibConfig
+-- Note: Using the same settings as package zlib
 
-compress
+-- |
+-- Compress a stream of 'ByteString's into the gzip format.
+compressGZip
+    :: MonadIO m
+    => Enumeratee ByteString ByteString m a
+compressGZip = compressWith 6 gzipConfig
+-- Note: Using the same settings as package zlib
+
+-- |
+-- Compress (deflate) a stream of 'ByteString's with custom
+-- parameters. The 'WindowBits' also control the format (zlib vs. gzip).
+
+compressWith
     :: MonadIO m
     => Int         -- ^ Compression level
     -> WindowBits  -- ^ Zlib parameter (see the zlib-bindings package as well as the zlib C library)
     -> Enumeratee ByteString ByteString m a
-compress level config inner = do
+compressWith level config inner = do
     def <- liftIO $ initDeflate level config
-    compress' def inner
+    compressWith' def inner
 
-compress' :: MonadIO m => Deflate -> Enumeratee ByteString ByteString m b
-compress' def (Continue k) = do
+compressWith'
+    :: MonadIO m
+    => Deflate
+    -> Enumeratee ByteString ByteString m b
+compressWith' def (Continue k) = do
     x <- EL.head
     case x of
         Nothing -> do
@@ -68,26 +127,26 @@ compress' def (Continue k) = do
         Just bs -> do
             chunks <- liftIO $ withDeflateInput def bs $ go id
             step <- lift $ runIteratee $ k $ Chunks chunks
-            compress' def step
+            compressWith' def step
     where
     go front pop = do
         x <- pop
         case x of
             Nothing -> return $ front []
             Just y -> go (front . (:) y) pop
-compress' _ step = return step
+compressWith' _ step = return step
 
 
 -- testInflate = do
 --     h <- openBinaryFile "test-out" WriteMode
 --     run $ enumFile "test.z"
---            $$ decompress defaultWindowBits
+--            $$ decompressWith defaultWindowBits
 --            $$ iterHandle h
 --     hClose h
 --
 -- testDeflate = do
 --     h <- openBinaryFile "test.z" WriteMode
 --     run $ enumFile "test"
---            $$ compress 7 defaultWindowBits
+--            $$ compressWith 7 defaultWindowBits
 --            $$ iterHandle h
 --     hClose h
