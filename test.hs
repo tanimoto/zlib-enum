@@ -47,7 +47,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Monadic
 import qualified Test.QuickCheck.Monadic as Q
 
-import System.IO (IOMode (..), openFile, hClose)
+import System.IO (IOMode (..), openBinaryFile, hClose)
 
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -162,7 +162,7 @@ compressFileWith
   :: Enumeratee ByteString ByteString IO ()
   -> WindowBits -> FilePath -> [ByteString] -> IO ()
 compressFileWith enum win file xs = bracket
-  (openFile file WriteMode)
+  (openBinaryFile file WriteMode)
   (hClose)
   $ \ h -> do
     run_ $  E.enumList 1 xs
