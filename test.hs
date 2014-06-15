@@ -191,10 +191,10 @@ compressChunks :: WindowBits -> [ByteString] -> IO [ByteString]
 compressChunks win xs = do
     def <- initDeflate 7 win
     gziped <- foldM (go' def) id xs
-    gziped' <- finishDeflate def $ go gziped
+    gziped' <- go gziped (finishDeflate def)
     return $ gziped' []
     where
-    go' def front bs = withDeflateInput def bs $ go front
+    go' def front bs = feedDeflate def bs >>= go front
     go front x = do
         y <- x
         case y of
@@ -209,7 +209,7 @@ decompressChunks win xs = do
     final <- finishInflate inf
     return $ ungziped [final]
     where
-    go' inf front bs = withInflateInput inf bs $ go front
+    go' inf front bs = feedInflate inf bs >>= go front
     go front x = do
         y <- x
         case y of
@@ -266,13 +266,13 @@ prop_unconsumed win xs = monadicIO $ do
 -- | Check if mapping the identity function doesn't affect anything
 prop_map_id :: WindowBits -> [ByteString] -> Property
 prop_map_id win xs = monadicIO $ do
-  ys <- Q.run $ compressDecompressWith (E.map id) win xs
+  ys <- Q.run $ compressDecompressWith (EL.map id) win xs
   assert (B.concat xs == ys)
 
 -- | Check if mapping 'reverse . reverse' doesn't affect anything
 prop_map_revrev :: WindowBits -> [ByteString] -> Property
 prop_map_revrev win xs = monadicIO $ do
-  ys <- Q.run $ compressDecompressWith (E.map $ B.reverse . B.reverse) win xs
+  ys <- Q.run $ compressDecompressWith (EL.map $ B.reverse . B.reverse) win xs
   assert (B.concat xs == ys)
 
 -- | Check if compressing and decompressing multiple times works
@@ -288,7 +288,7 @@ prop_files_map_id file win xs = monadicIO $ do
   ys <- Q.run $ decompressFileWith enum win file
   assert (B.concat xs == ys)
   where
-  enum = E.map id
+  enum = EL.map id
 
 -- | Check compressing and decompressing a file with an Iteratee that
 -- consumes only a few bytes
